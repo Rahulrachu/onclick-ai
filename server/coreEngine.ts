@@ -2,6 +2,7 @@ import { getDb } from "./db";
 import { tasks, taskSteps, agentLogs, toolExecutions, taskArtifacts, agentMemories } from "../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { executeTool, logAgentEvent, AgentRole } from "./agentRuntime";
+import { callLLMProvider, LLMMessage } from "./llmProvider";
 
 export interface ExecutionPlan {
   goal: string;
@@ -14,10 +15,36 @@ export interface ExecutionPlan {
   }[];
 }
 
-// Autonomous Planner Engine
-export function decomposeGoalToPlan(goal: string): ExecutionPlan {
+// Autonomous Planner Engine with LLM Integration
+export async function decomposeGoalToPlan(goal: string): Promise<ExecutionPlan> {
+  const messages: LLMMessage[] = [
+    {
+      role: "system",
+      content: "You are OnClick AI's expert Planner. Decompose the user goal into 4 to 6 sequential collaborative steps across specialized agents (Research, Browser, Data, Coding, Verification, File). Return valid JSON: { \"steps\": [ { \"stepIndex\": 1, \"title\": \"...\", \"description\": \"...\", \"agent\": \"Research|Browser|Data|Coding|Verification|File\", \"dependencies\": [] } ] }"
+    },
+    { role: "user", content: goal }
+  ];
+
+  try {
+    const raw = await callLLMProvider(messages);
+    const parsed = JSON.parse(raw);
+    if (parsed && Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+      return {
+        goal,
+        steps: parsed.steps.map((s: any, idx: number) => ({
+          stepIndex: s.stepIndex || idx + 1,
+          title: s.title || `Step ${idx + 1}`,
+          description: s.description || "",
+          agent: (s.agent as AgentRole) || "Research",
+          dependencies: Array.isArray(s.dependencies) ? s.dependencies : []
+        }))
+      };
+    }
+  } catch (err) {
+    console.warn("[Planner] LLM decomposition failed, using deterministic fallback plan:", err);
+  }
+
   const lower = goal.toLowerCase();
-  
   if (lower.includes("research") || lower.includes("compare") || lower.includes("college") || lower.includes("university")) {
     return {
       goal,
@@ -29,20 +56,8 @@ export function decomposeGoalToPlan(goal: string): ExecutionPlan {
         { stepIndex: 5, title: "Generate PDF Report", description: "Synthesize findings into a professional formatted PDF report", agent: "File", dependencies: [4] }
       ]
     };
-  } else if (lower.includes("code") || lower.includes("app") || lower.includes("flask") || lower.includes("application")) {
-    return {
-      goal,
-      steps: [
-        { stepIndex: 1, title: "Initialize Software Project", description: "Create project directory structure and configuration files", agent: "Coding", dependencies: [] },
-        { stepIndex: 2, title: "Write Application Code", description: "Implement backend logic, routers, and templates", agent: "Coding", dependencies: [1] },
-        { stepIndex: 3, title: "Install Dependencies & Run Tests", description: "Install required packages and run automated test suites", agent: "Security", dependencies: [2] },
-        { stepIndex: 4, title: "Error Inspection & Debugging", description: "Detect compile/runtime errors, debug code, and verify build", agent: "Recovery", dependencies: [3] },
-        { stepIndex: 5, title: "Final Build & Documentation", description: "Generate project documentation and release package", agent: "File", dependencies: [4] }
-      ]
-    };
   }
 
-  // Default general plan
   return {
     goal,
     steps: [
@@ -72,7 +87,7 @@ export async function executeTaskWithSelfCorrection(taskId: number) {
   await logAgentEvent(taskId, "Orchestrator", "action started", `Executing goal: "${task.goal}"`);
 
   // Generate plan
-  const plan = decomposeGoalToPlan(task.goal);
+  const plan = await decomposeGoalToPlan(task.goal);
   await db.update(tasks).set({
     activeAgent: "Planner",
     currentAction: "Generated structured execution plan",
@@ -112,7 +127,6 @@ export async function executeTaskWithSelfCorrection(taskId: number) {
 
     while (retries < 3 && !success) {
       try {
-        // Execute tool based on agent role
         if (step.agent === "Research" || step.agent === "Browser") {
           await executeTool(taskId, "search_web", { query: step.description });
         } else if (step.agent === "Data") {
@@ -135,7 +149,6 @@ export async function executeTaskWithSelfCorrection(taskId: number) {
         retries++;
         await logAgentEvent(taskId, "Recovery", "action started", `Failure detected in step ${step.stepIndex}. Attempting recovery (retry ${retries}/3)...`, { error: err.message });
         if (retries >= 3) {
-          // Trigger replanning / failure state
           await db.update(taskSteps)
             .set({ status: "failed", output: err.message })
             .where(and(eq(taskSteps.taskId, taskId), eq(taskSteps.stepIndex, step.stepIndex)));
@@ -152,7 +165,6 @@ export async function executeTaskWithSelfCorrection(taskId: number) {
     }
   }
 
-  // Task success
   await db.update(tasks).set({
     status: "completed",
     activeAgent: "Orchestrator",

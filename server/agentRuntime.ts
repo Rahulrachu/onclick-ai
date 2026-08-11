@@ -161,7 +161,7 @@ export async function executeTool(taskId: number, toolName: string, inputData: a
 
   let output: any = { result: `Successfully executed ${toolName}`, data: safeInput };
   if (["open_url", "search_web", "extract_page", "screenshot_page", "click_element", "type_form"].includes(toolName)) {
-    output = await executeRealBrowserAction(toolName, safeInput);
+    output = await executeRealBrowserAction(taskId, toolName, safeInput);
   } else if (["screenshot", "click", "mouse_move", "keyboard_type", "double_click", "right_click", "drag_drop", "scroll"].includes(toolName)) {
     output = await executeComputerControl(toolName, safeInput);
   } else if (toolName === "create_pdf" || toolName === "create_document") {

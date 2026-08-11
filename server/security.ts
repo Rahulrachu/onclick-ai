@@ -1,6 +1,6 @@
 import path from "node:path";
 
-export const WORKSPACE_ROOT = path.resolve(process.env.ONCLICK_WORKSPACE_ROOT || "/tmp/onclick-ai-workspaces");
+export const WORKSPACE_ROOT = path.resolve(process.env.ONCLICK_WORKSPACE_ROOT || path.join(process.cwd(), "workspaces"));
 
 const BLOCKED_COMMANDS = [
   /\brm\s+-rf\b/i,
@@ -20,7 +20,7 @@ export function resolveWorkspacePath(taskId: number, candidate: string) {
   if (!Number.isInteger(taskId) || taskId < 1) throw new Error("Invalid task ID");
   if (!candidate || candidate.includes("\0")) throw new Error("Invalid workspace path");
 
-  const taskRoot = path.resolve(WORKSPACE_ROOT, `task-${taskId}`);
+  const taskRoot = path.resolve(process.env.ONCLICK_VM_ROOT || "/home/ubuntu/onclick-ai-vms", `mission-task-${taskId}`, "workspace");
   const resolved = path.resolve(taskRoot, candidate);
   if (resolved !== taskRoot && !resolved.startsWith(`${taskRoot}${path.sep}`)) {
     throw new Error("Path escapes task workspace");

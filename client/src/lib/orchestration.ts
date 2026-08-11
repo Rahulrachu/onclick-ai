@@ -21,32 +21,45 @@ export type TimelineEvent = {
   agent: string;
   message: string;
   timestamp: number;
+  createdAt?: Date | string | number;
 };
 
-export function mergeTimeline(liveEvents: TimelineEvent[], persistedEvents: TimelineEvent[], limit = 24): TimelineEvent[] {
-  return [...liveEvents, ...persistedEvents].slice(0, limit);
+export function mergeTimeline(liveEvents: any[], persistedEvents: any[], limit = 50): TimelineEvent[] {
+  const combined = [...liveEvents, ...persistedEvents].map((e) => ({
+    eventType: e.eventType || "action started",
+    agent: e.agent || "Orchestrator",
+    message: e.message || "",
+    timestamp: e.timestamp ? Number(e.timestamp) : e.createdAt ? new Date(e.createdAt).getTime() : Date.now(),
+  }));
+  return combined.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
 }
 
 export function getPendingApproval(
-  liveEvents: Array<ApprovalLiveEvent | { eventType: string }>,
-  tools: PersistedToolExecution[],
+  tools: any[],
+  liveEvents: any[] = [],
   activeAgent = "Orchestrator",
-): ApprovalLiveEvent | null {
-  const live = liveEvents.find(
-    (event): event is ApprovalLiveEvent => event.eventType === "approval requested" && "toolExecutionId" in event && Boolean(event.toolExecutionId),
-  );
-  if (live) return live;
-
+): { id: number; toolName: string; permissionTier: string; taskId?: number } | null {
   const persisted = tools.find((tool) => tool.status === "pending_approval");
-  if (!persisted) return null;
+  if (persisted) {
+    return {
+      id: persisted.id,
+      toolName: persisted.toolName,
+      permissionTier: persisted.permissionTier,
+      taskId: persisted.taskId,
+    };
+  }
 
-  return {
-    eventType: "approval requested",
-    agent: activeAgent,
-    message: `${persisted.toolName} is waiting for operator approval.`,
-    timestamp: new Date(persisted.createdAt).getTime(),
-    toolExecutionId: persisted.id,
-    toolName: persisted.toolName,
-    permissionTier: persisted.permissionTier,
-  };
+  const live = liveEvents.find((event) => event.eventType === "approval requested");
+  if (live && live.metadata?.executionId) {
+    return {
+      id: Number(live.metadata.executionId),
+      toolName: live.metadata.toolName || "execute_command",
+      permissionTier: live.metadata.permissionTier || "CONFIRM",
+      taskId: live.taskId,
+    };
+  }
+
+  return null;
 }
+
+export const getPendingApprovalFromTask = getPendingApproval;

@@ -8,6 +8,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { addSseClient, removeSseClient } from "../agentRuntime";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -31,12 +32,35 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
+  
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
-  // tRPC API
+
+  // SSE event streaming endpoint for real-time agent execution
+  app.get("/api/events/:taskId", (req, res) => {
+    const taskId = parseInt(req.params.taskId, 10);
+    if (isNaN(taskId)) {
+      res.status(400).send("Invalid task ID");
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    // Send initial connection ACK
+    res.write(`event: connected\ndata: ${JSON.stringify({ taskId, status: "connected" })}\n\n`);
+
+    addSseClient(taskId, res);
+
+    req.on("close", () => {
+      removeSseClient(taskId, res);
+    });
+  });
+
   app.use(
     "/api/trpc",
     createExpressMiddleware({
@@ -44,7 +68,7 @@ async function startServer() {
       createContext,
     })
   );
-  // development mode uses Vite, production mode uses static files
+
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {

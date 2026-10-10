@@ -1,90 +1,82 @@
 # OnClick AI
 
-OnClick AI is a production-grade multi-agent AI orchestration platform featuring a bold Brutalist visual identity, 12 specialized agent roles, a modular tool registry with strict permission tiers (`SAFE`, `CONFIRM`, `RESTRICTED`), real-time Server-Sent Events (SSE) streaming, inspectable memory tiers, persistent Playwright browser automation, computer-use controls, autonomous planning, observation, verification, and automated failure recovery.
+Type what you want. OnClick AI does it on your PC.
 
----
+> "Find the cheapest Bengaluru → Delhi flight next Friday and take me to checkout"
+> "Build a modern two-storey house in Blender and render it at sunset"
+> "Write a Python script that sorts my Downloads folder by file type, then run it"
 
-## Architecture
+OnClick AI is a Windows desktop app (`OnClickAI.exe`). You give it a prompt, and an AI model plans the task and carries it out with real tools: a visible web browser, your terminal, your files, Blender, and mouse-and-keyboard control of any app. It looks at the result of every step (page text, screenshots, renders) and keeps going until the job is done.
 
-OnClick AI implements a genuine autonomous execution loop:
+## Download
 
-```
-User Goal → LLM Reasoning → Task Understanding → Planning → Structured Tool Call → Real Tool Execution → Browser / Computer Action → Observation → Result Interpretation → Verification → Success? ──(Yes)──> Complete
-  │
-  └──(No)──> Diagnose → Recover → Replan → Execute Again
-```
+Grab the newest `OnClickAI.exe` from **[Releases](../../releases)**. Every push to `main` builds a fresh one on GitHub Actions.
 
----
+First launch opens **Settings**: pick a provider and paste an API key.
 
-## Core Features
+| Provider | Default model | Key |
+|---|---|---|
+| Gemini (default, has a free tier) | gemini-2.5-flash | aistudio.google.com/apikey |
+| OpenAI | gpt-4.1 | platform.openai.com |
+| Anthropic | claude-sonnet-4-5 | console.anthropic.com |
+| OpenRouter | any | openrouter.ai |
+| Groq | llama-3.3-70b (no vision) | console.groq.com |
+| Ollama | runs locally, no key | ollama.com |
 
-1. **Autonomous Planning Engine:** Decomposes user goals into structured dependency graphs across specialized collaborating agents.
-2. **Real Playwright Browser Automation:** Maintains persistent browser contexts, tabs, navigation, clicks, typing, scrolling, screenshots, and DOM inspection.
-3. **Computer-Use Controls:** Real coordinate clicks, mouse movement, keyboard typing, and screen capture.
-4. **12 Specialized Agent Roles:** Orchestrator, Planner, Research, Browser, Computer, Coding, File, Data, Reasoning, Verification, Critic, Recovery, and Security.
-5. **Strict Security & Permissions:** Safeguarded with path traversal protection, command validation, credential redaction, and `SAFE`, `CONFIRM`, and `RESTRICTED` permission tiers.
-6. **Real-Time SSE Streaming:** Streams exact live events (`TASK_STARTED`, `PLAN_CREATED`, `TOOL_STARTED`, `TOOL_COMPLETED`, etc.) to the Brutalist dashboard.
-7. **Durable Artifact Storage:** S3-backed workspace storage for generated reports, PDFs, screenshots, and datasets.
+Pick a model with vision (Gemini, GPT-4.1, Claude) for screen control and checking Blender renders.
 
----
+## What it can do
 
-## Installation & Setup
+| Tool group | Tools | Used for |
+|---|---|---|
+| Browser | open, snapshot, click, type, select, press, scroll, back, screenshot | Flights, hotels, shopping, forms, any website. Uses your installed Edge with its own saved profile, so a site you sign into once stays signed in. |
+| Web | web_search, fetch_url | Fast lookups without opening a browser |
+| System | run_command (PowerShell), open_app, read/write/list files, ask_user | Installing software (winget, pip), scripts, coding projects |
+| Blender | blender_run_script, blender_open | Writes bpy scripts, builds the scene, renders a PNG, looks at the render, and fixes it |
+| Desktop | screenshot, mouse_click, mouse_drag, type_text, press_keys, scroll, wait | Any app without a better route |
 
-```bash
-# Clone repository
-git clone https://github.com/Rahulrachu/onclick-ai.git
-cd onclick-ai
+Everything it makes is saved in `C:\Users\<you>\OnClickAI\`.
 
-# Install dependencies
-pnpm install
+## Safety
 
-# Configure environment
-cp .env.example .env
-```
+- It **always asks you first** before clicking anything that pays, books, orders, sends, or publishes, and before commands that delete or change system data.
+- It never types card numbers. You finish payment yourself in the open browser.
+- It asks you for details only you know (dates, names, which option) instead of guessing.
+- **Emergency stop:** slam the mouse into any screen corner, or press Stop.
 
----
-
-## Environment Variables (`.env.example`)
-
-```env
-DATABASE_URL=mysql://user:pass@localhost:3306/onclick_ai
-JWT_SECRET=your_jwt_secret_here
-OPENAI_API_KEY=your_openai_api_key_here
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-```
-
----
-
-## Running Locally
+## Run from source
 
 ```bash
-# Start development server
-pnpm dev
+pip install -r requirements.txt
+python -m onclick            # window
+python -m onclick --cli      # terminal chat
+python -m onclick "make a hello world website in my workspace and open it"
 ```
 
----
-
-## Running Tests & Builds
+## Build the exe yourself
 
 ```bash
-# Type check
-pnpm check
-
-# Run Vitest suite (all unit, security, router, and acceptance tests)
-pnpm test
-
-# Build for production
-pnpm build
+pip install -r requirements-dev.txt
+pyinstaller --onefile --windowed --name OnClickAI --collect-all playwright run.py
 ```
 
----
+## How it works
 
-## Acceptance Benchmarks
+```
+prompt → model plans → tool call → real action (browser / shell / Blender / mouse)
+       → observation (text, screenshot, render) → model checks it → next step … → done
+```
 
-OnClick AI includes comprehensive acceptance test benchmarks (`server/acceptanceMissions.test.ts`) covering browser research, document generation, coding utility creation, failure recovery, and multi-step mission execution.
+- `onclick/agent.py` the loop, approvals, image handling
+- `onclick/llm.py` provider clients (OpenAI-style and Anthropic) with tool calling
+- `onclick/tools/` browser, web, system, desktop, Blender
+- `onclick/safety.py` what needs your OK
+- `onclick/gui.py` the window; `onclick/__main__.py` CLI
 
----
+## Roadmap
 
-## License
-
-MIT License.
+- Voice prompts and a global hotkey
+- Task history and resumable runs
+- Accessibility-tree control of Windows apps (faster and more reliable than clicking pixels)
+- Blender add-on mode (drive the open Blender window live)
+- Parallel sub-agents for research-heavy tasks

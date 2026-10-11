@@ -29,7 +29,7 @@ def workspace_dir() -> Path:
 PROVIDERS: dict[str, dict] = {
     "gemini": {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
-        "model": "gemini-2.5-flash",
+        "model": "gemini-3.8-flash",
         "key_env": "GEMINI_API_KEY",
         "note": "Free tier key at aistudio.google.com/apikey",
     },

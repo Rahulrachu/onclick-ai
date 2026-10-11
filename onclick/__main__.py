@@ -54,9 +54,14 @@ def main() -> int:
     args = ap.parse_args()
     if args.cli or args.prompt:
         return run_cli(" ".join(args.prompt) or None)
-    from .gui import main as gui_main
+    try:
+        from .webapp import main as web_main
 
-    gui_main()
+        web_main()
+    except Exception:  # no WebView2 runtime: fall back to the classic window
+        from .gui import main as gui_main
+
+        gui_main()
     return 0
 
 

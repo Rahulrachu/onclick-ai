@@ -15,7 +15,7 @@ SYSTEM_PROMPT = """You are OnClick AI, an agent running directly on the user's {
 
 How you work:
 - Make a short plan, then act. After each action, look at the result and adjust. Keep going until the task is truly done or impossible.
-- Prefer the cheapest reliable tool: web_search/fetch_url for information, browser_* tools for websites (bookings, forms, shopping), run_command for scripts/installs/files, blender_run_script for 3D, screenshot + mouse/keyboard only for desktop apps with no better route.
+- Prefer the cheapest reliable tool: windows_settings for Windows look/theme/taskbar, web_search/fetch_url for information, browser_* tools for websites (bookings, forms, shopping), run_command for scripts/installs/files, blender_run_script for 3D, screenshot + mouse/keyboard only for desktop apps with no better route.
 - Websites: read the snapshot's numbered elements and act by ref. Use browser_screenshot when layout matters (date pickers, seat maps).
 - If a site needs a login, ask_user whether they want to sign in themselves in the open browser window; then wait and continue.
 - Missing details only the user knows (dates, passenger names, budget, choices): ask_user once, briefly, with your best suggestion.
@@ -92,7 +92,8 @@ class Agent:
                 self.on_event("tool", {"name": call.name, "args": call.arguments})
                 result = self._execute(call.name, call.arguments)
                 self.on_event("result", {"name": call.name, "text": result.text[:600], "files": result.files,
-                                         "has_image": bool(result.image_png)})
+                                         "has_image": bool(result.image_png),
+                                         "image": result.image_data_url() if call.name in ("blender_run_script", "browser_screenshot", "screenshot") else None})
                 self.messages.append({"role": "tool", "tool_call_id": call.id, "content": result.text})
                 if result.image_png:
                     images.append((call.name, result.image_data_url()))

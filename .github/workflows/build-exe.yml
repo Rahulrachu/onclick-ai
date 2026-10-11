@@ -38,6 +38,21 @@ jobs:
           name: blender-smoke-render
           path: smoke-out/blender/
 
+  ui-screenshots:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip ci]')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install playwright pillow && python -m playwright install --with-deps chromium
+      - run: python tests/smoke/ui_screenshot.py
+      - name: Commit screenshots
+        run: |
+          git config user.name "OnClick AI Bot"; git config user.email "bot@onclick.local"
+          git add docs/*.png
+          git diff --cached --quiet || (git commit -m "Update UI screenshots [skip ci]" && git push)
+
   build:
     needs: test
     runs-on: windows-latest
@@ -49,8 +64,8 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: Build OnClickAI.exe (window) and OnClickAI-cli.exe (terminal)
         run: |
-          pyinstaller --noconfirm --onefile --windowed --name OnClickAI --collect-all playwright run.py
-          pyinstaller --noconfirm --onefile --console --name OnClickAI-cli --collect-all playwright run.py
+          pyinstaller --noconfirm --onefile --windowed --name OnClickAI --collect-all playwright --collect-all webview --add-data "onclick/ui;onclick/ui" run.py
+          pyinstaller --noconfirm --onefile --console --name OnClickAI-cli --collect-all playwright --collect-all webview --add-data "onclick/ui;onclick/ui" run.py
       - name: Smoke test
         shell: pwsh
         run: dist\OnClickAI-cli.exe --help

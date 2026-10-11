@@ -69,10 +69,10 @@ class Registry:
 
 
 def build_registry(ctx) -> Registry:
-    from . import blender, browser, desktop, system, web
+    from . import blender, browser, desktop, system, web, windows
 
     reg = Registry()
-    for module in (system, web, browser, desktop, blender):
+    for module in (system, web, browser, desktop, blender, windows):
         for tool in module.tools(ctx):
             reg.add(tool)
     return reg

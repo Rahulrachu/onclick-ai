@@ -8,6 +8,8 @@ Type what you want. OnClick AI does it on your PC.
 
 OnClick AI is a Windows desktop app (`OnClickAI.exe`). You give it a prompt, and an AI model plans the task and carries it out with real tools: a visible web browser, your terminal, your files, Blender, and mouse-and-keyboard control of any app. It looks at the result of every step (page text, screenshots, renders) and keeps going until the job is done.
 
+![OnClick AI](docs/ui-task.png)
+
 ## Download
 
 Grab the newest `OnClickAI.exe` from **[Releases](../../releases)**. Every push to `main` builds a fresh one on GitHub Actions.
@@ -33,6 +35,7 @@ Pick a model with vision (Gemini, GPT-4.1, Claude) for screen control and checki
 | Web | web_search, fetch_url | Fast lookups without opening a browser |
 | System | run_command (PowerShell), open_app, read/write/list files, ask_user | Installing software (winget, pip), scripts, coding projects |
 | Blender | blender_run_script, blender_open | Writes bpy scripts, builds the scene, renders a PNG, looks at the render, and fixes it |
+| Windows look | windows_settings: dark/light mode, transparency, taskbar alignment and auto-hide, wallpaper, accent color, one-call macOS-style setup (dock, translucent taskbar, Quick Look, PowerToys, Seelen UI) | "Make my PC dark mode and look like a Mac" |
 | Desktop | screenshot, mouse_click, mouse_drag, type_text, press_keys, scroll, wait | Any app without a better route |
 
 Everything it makes is saved in `C:\Users\<you>\OnClickAI\`.
@@ -71,7 +74,7 @@ prompt → model plans → tool call → real action (browser / shell / Blender 
 - `onclick/llm.py` provider clients (OpenAI-style and Anthropic) with tool calling
 - `onclick/tools/` browser, web, system, desktop, Blender
 - `onclick/safety.py` what needs your OK
-- `onclick/gui.py` the window; `onclick/__main__.py` CLI
+- `onclick/ui/index.html` + `onclick/webapp.py` the chat window (Edge WebView2); `onclick/gui.py` classic fallback window; `onclick/__main__.py` CLI
 
 ## Roadmap
 

@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install requests pytest
+      - run: pip install requests pytest numpy
       - run: python -m pytest -q
 
   blender-smoke:
@@ -65,8 +65,8 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: Build OnClickAI.exe (window) and OnClickAI-cli.exe (terminal)
         run: |
-          pyinstaller --noconfirm --onefile --windowed --name OnClickAI --collect-all playwright --collect-all webview --add-data "onclick/ui;onclick/ui" run.py
-          pyinstaller --noconfirm --onefile --console --name OnClickAI-cli --collect-all playwright --collect-all webview --add-data "onclick/ui;onclick/ui" run.py
+          pyinstaller --noconfirm --onefile --windowed --name OnClickAI --collect-all playwright --collect-all webview --collect-all sounddevice --hidden-import _sounddevice_data --add-data "onclick/ui;onclick/ui" run.py
+          pyinstaller --noconfirm --onefile --console --name OnClickAI-cli --collect-all playwright --collect-all webview --collect-all sounddevice --hidden-import _sounddevice_data --add-data "onclick/ui;onclick/ui" run.py
       - name: Smoke test
         shell: pwsh
         run: dist\OnClickAI-cli.exe --help

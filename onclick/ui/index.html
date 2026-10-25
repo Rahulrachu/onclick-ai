@@ -64,6 +64,13 @@ footer{padding:14px 22px 20px}
 .composer:focus-within{border-color:#3a3550}
 textarea{flex:1;background:transparent;border:0;outline:0;color:var(--fg);font:inherit;font-size:15px;resize:none;max-height:180px;padding:6px 0}
 .send{width:40px;height:40px;border-radius:12px;border:0;cursor:pointer;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;font-size:17px;display:grid;place-items:center}
+.mic{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);cursor:pointer;background:var(--card);color:#fff;font-size:17px;display:grid;place-items:center;position:relative}
+.mic.on{background:#e5484d;border-color:#e5484d;animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(229,72,77,.6)}70%{box-shadow:0 0 0 12px rgba(229,72,77,0)}100%{box-shadow:0 0 0 0 rgba(229,72,77,0)}}
+.lang{background:var(--card);color:#cfd0dc;border:1px solid var(--line);border-radius:10px;height:40px;padding:0 8px;font-size:13px}
+.vbar{max-width:820px;margin:6px auto 0;height:4px;border-radius:2px;overflow:hidden}
+.vbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .08s}
+.vtag{font-size:11px;opacity:.7;margin-bottom:4px}
 .send.stop{background:var(--card);border:1px solid var(--line)}
 .hint{max-width:820px;margin:8px auto 0;color:var(--mute);font-size:12px;text-align:center}
 /* overlays */
@@ -98,8 +105,10 @@ input,select{width:100%;height:38px;background:var(--card);border:1px solid var(
   <main id="main"><div class="feed" id="feed">
     <div class="hero" id="hero">
       <h1>What should I do for you?</h1>
-      <p>Type a task. I'll open the apps, browse, click and build it on this PC.</p>
+      <p>Speak or type a task in Kannada, Hinglish, Hindi, Tamil, Telugu or English. I'll open the apps, browse, click and build it on this PC.</p>
       <div class="chips">
+        <div class="chip" onclick="useChip(this)"><b>🎙 ಕನ್ನಡ</b><span>Downloads folder alli iro PDF ella ondu folder ge haaki</span></div>
+        <div class="chip" onclick="useChip(this)"><b>🎙 Hinglish</b><span>Chrome kholo aur YouTube pe lo-fi music chalao</span></div>
         <div class="chip" onclick="useChip(this)"><b>✈️ Find a flight</b><span>Cheapest Bengaluru → Delhi flight next Friday, take me to checkout</span></div>
         <div class="chip" onclick="useChip(this)"><b>🏠 3D house in Blender</b><span>Build a modern two-storey house in Blender and render it at sunset</span></div>
         <div class="chip" onclick="useChip(this)"><b>🌙 Mac-style desktop</b><span>Switch Windows to dark mode and make it look like macOS</span></div>
@@ -110,8 +119,11 @@ input,select{width:100%;height:38px;background:var(--card);border:1px solid var(
   <footer>
     <div class="composer">
       <textarea id="input" rows="1" placeholder="Ask OnClick AI to do anything…"></textarea>
+      <select class="lang" id="lang" title="Voice language" onchange="saveLang()"></select>
+      <button class="mic" id="mic" title="Speak (Ctrl+Space)" onclick="toggleMic()">🎙</button>
       <button class="send" id="send" onclick="sendOrStop()">➤</button>
     </div>
+    <div class="vbar"><i id="lvl"></i></div>
     <div class="hint">Asks before paying, sending or deleting · Slam the mouse into a screen corner to emergency-stop</div>
   </footer>
 </div>
@@ -133,6 +145,9 @@ input,select{width:100%;height:38px;background:var(--card);border:1px solid var(
   <div class="small" id="s-note"></div>
   <label>API key</label><input id="s-key" type="password" placeholder="Paste your key">
   <label>Model (leave blank for default)</label><input id="s-model">
+  <label>Gnani AI API key (voice)</label><input id="s-gkey" type="password" placeholder="From app.gnani.ai → API keys">
+  <div class="small">Speech-to-text by Gnani Prisma v2.5, spoken replies by Gnani Timbre v2.5.</div>
+  <div class="check"><input type="checkbox" id="s-speak"><span>Read answers to voice requests aloud</span></div>
   <label>Blender path (auto-detected)</label><input id="s-blender">
   <label>Max steps per task</label><input id="s-steps" type="number" min="5" max="200">
   <div class="check"><input type="checkbox" id="s-auto"><span>Don't ask before paying, sending or deleting (not recommended)</span></div>
@@ -153,9 +168,9 @@ function scroll(){ const m=$('main'); m.scrollTop=m.scrollHeight; }
 function setBusy(b,text){ busy=b; $('dot').className='dot'+(b?' busy':''); $('status').textContent=text||(b?'Working…':'Ready');
   $('send').className='send'+(b?' stop':''); $('send').textContent=b?'■':'➤'; }
 
-function addUser(text){
+function addUser(text, tag){
   $('hero') && $('hero').remove();
-  const d=document.createElement('div'); d.className='msg user'; d.innerHTML=`<div class="bubble">${esc(text)}</div>`; $('feed').appendChild(d);
+  const d=document.createElement('div'); d.className='msg user'; d.innerHTML=`<div class="bubble">${tag?`<div class="vtag">${esc(tag)}</div>`:''}${esc(text)}</div>`; $('feed').appendChild(d);
   turn=document.createElement('div'); turn.className='msg ai';
   turn.innerHTML=`<div class="avatar">O</div><div class="body"><details class="steps" open><summary>⚙️ <span class="cnt">Starting…</span></summary><div class="list"></div></details><div class="out"></div><div class="typing"><span></span><span></span><span></span></div></div>`;
   $('feed').appendChild(turn); scroll();
@@ -163,7 +178,24 @@ function addUser(text){
 function stepList(){ return turn.querySelector('.list'); }
 function bump(){ const n=stepList().children.length; turn.querySelector('.cnt').textContent=`${n} action${n===1?'':'s'}`; }
 
+let listening=false;
+const VOICE={listening:1,transcribing:1,heard:1,speaking:1,spoken:1};
+function voiceEvent(kind,d){
+  if(kind==='listening'){ listening=true; $('mic').classList.add('on'); setBusy(false,'Listening… speak now'); }
+  else if(kind==='transcribing'){ listening=false; $('mic').classList.remove('on'); $('lvl').style.width='0'; setBusy(true,'Gnani Prisma is transcribing…'); }
+  else if(kind==='heard'){ listening=false; $('mic').classList.remove('on'); $('lvl').style.width='0';
+    if(d.error||!d.text){ setBusy(false, d.error||"Didn't catch that"); return; }
+    addUser(d.text, '🎙 '+(($('lang').selectedOptions[0]||{}).text||'')+' · '+d.latency_ms+' ms'); setBusy(true); }
+  else if(kind==='speaking'){ $('status').textContent='🔊 Speaking (Gnani Timbre)…'; }
+  else if(kind==='spoken'){ if(!busy) $('status').textContent='Ready'; }
+}
+window.onLevel=function(v){ $('lvl').style.width=Math.round(v*100)+'%'; };
+function toggleMic(){ if(busy||listening) return; api().listen($('lang').value).then(r=>{ if(r&&r.error){ alert(r.error); openSettings(); } }); }
+function saveLang(){ api().save_config({voice_language:$('lang').value}); }
+document.addEventListener('keydown',e=>{ if(e.ctrlKey && e.code==='Space'){ e.preventDefault(); toggleMic(); } });
+
 window.onEvent = function(kind, d){
+  if(VOICE[kind]){ voiceEvent(kind,d); return; }
   if(!turn && kind!=='done') return;
   if(kind==='thinking'){ setBusy(true,`Working · step ${d.step}`); }
   else if(kind==='say' && d.text.trim()){ const t=document.createElement('div'); t.className='text'; t.textContent=d.text.trim(); turn.querySelector('.out').appendChild(t); }
@@ -213,16 +245,17 @@ $('input').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.p
 async function openSettings(){
   const c=await api().get_config(); providers=c.providers;
   $('s-provider').innerHTML=Object.keys(providers).map(p=>`<option ${p===c.provider?'selected':''}>${p}</option>`).join('');
-  $('s-key').value=c.api_key; $('s-model').value=c.model; $('s-blender').value=c.blender_path; $('s-steps').value=c.max_steps; $('s-auto').checked=c.auto_approve_risky;
+  $('s-key').value=c.api_key; $('s-model').value=c.model; $('s-blender').value=c.blender_path; $('s-steps').value=c.max_steps; $('s-auto').checked=c.auto_approve_risky; $('s-gkey').value=c.gnani_api_key||''; $('s-speak').checked=c.speak_replies;
   provNote(); $('ov-settings').classList.add('show');
 }
 function provNote(){ const p=providers[$('s-provider').value]||{}; $('s-note').textContent=`Default model ${p.model||''} · ${p.note||''}`; }
 async function saveSettings(){
   await api().save_config({provider:$('s-provider').value, api_key:$('s-key').value.trim(), model:$('s-model').value.trim(),
-    blender_path:$('s-blender').value.trim(), max_steps:parseInt($('s-steps').value||'40'), auto_approve_risky:$('s-auto').checked});
+    blender_path:$('s-blender').value.trim(), max_steps:parseInt($('s-steps').value||'40'), auto_approve_risky:$('s-auto').checked, gnani_api_key:$('s-gkey').value.trim(), speak_replies:$('s-speak').checked});
   closeOv('ov-settings');
 }
-window.addEventListener('pywebviewready', async ()=>{ const c=await api().get_config(); if(!c.ready) openSettings(); $('input').focus(); });
+window.addEventListener('pywebviewready', async ()=>{ const c=await api().get_config();
+  const L=await api().languages(); $('lang').innerHTML=Object.entries(L).map(([k,v])=>`<option value="${k}" ${k===c.voice_language?'selected':''}>${v}</option>`).join(''); if(!c.ready) openSettings(); $('input').focus(); });
 </script>
 </body>
 </html>

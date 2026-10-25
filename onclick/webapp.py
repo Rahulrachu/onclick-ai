@@ -13,6 +13,7 @@ from pathlib import Path
 from .agent import Agent
 from .config import PROVIDERS, Config
 from .context import Context
+from . import voice as gvoice
 
 
 def ui_path() -> Path:
@@ -28,6 +29,7 @@ class Bridge:
         self._jobs: queue.Queue = queue.Queue()
         self._answer: queue.Queue = queue.Queue()
         self._agent: Agent | None = None
+        self._voice_lang: str | None = None
         self._ctx: Context | None = None
         threading.Thread(target=self._worker, daemon=True).start()
 
@@ -56,6 +58,54 @@ class Bridge:
         self._jobs.put(("run", text))
         return "ok"
 
+    # ---- voice (Gnani Prisma STT + Timbre TTS) ----
+    def languages(self):
+        return {k: v["label"] for k, v in gvoice.LANGUAGES.items()}
+
+    def listen(self, language: str = ""):
+        """Record one utterance, transcribe it with Prisma, and run it as a task."""
+        cfg = Config.load()
+        if not cfg.resolved_gnani_key():
+            return {"error": "Add your Gnani API key in Settings to use voice."}
+        lang = language or cfg.voice_language
+        threading.Thread(target=self._listen_once, args=(lang,), daemon=True).start()
+        return {"ok": True}
+
+    def _listen_once(self, lang: str):
+        from .voice import mic
+        cfg = Config.load()
+        try:
+            self._post("listening", {"language": lang})
+            wav = mic.record(on_level=lambda lv: self._js("onLevel", round(lv, 3)))
+            if len(wav) < 16000:  # under ~0.5 s of audio
+                self._post("heard", {"text": "", "error": "I didn't catch that. Tap the mic and try again."})
+                return
+            self._post("transcribing", {})
+            t = gvoice.transcribe(wav, lang, cfg.resolved_gnani_key())
+            self._post("heard", {"text": t.text, "language": lang, "latency_ms": t.latency_ms})
+            if t.text:
+                self._voice_lang = lang
+                self._jobs.put(("run", f"[voice:{lang}] {t.text}"))
+        except Exception as e:
+            self._post("heard", {"text": "", "error": f"{type(e).__name__}: {e}"})
+
+    def speak(self, text: str, language: str = ""):
+        threading.Thread(target=self._speak, args=(text, language), daemon=True).start()
+        return True
+
+    def _speak(self, text: str, language: str = ""):
+        from .voice import mic
+        cfg = Config.load()
+        if not text or not cfg.resolved_gnani_key():
+            return
+        try:
+            self._post("speaking", {})
+            mic.play(gvoice.synthesize(text, language or cfg.voice_language, cfg.resolved_gnani_key()))
+        except Exception as e:
+            self._post("error", {"text": f"Voice reply failed: {e}"})
+        finally:
+            self._post("spoken", {})
+
     def stop(self):
         if self._agent:
             self._agent.stop()
@@ -82,6 +132,11 @@ class Bridge:
 
     def _post(self, kind: str, data: dict):
         self._js("onEvent", kind, data)
+        # Read the final answer of a spoken request aloud in the language it was asked in.
+        if kind == "done" and self._voice_lang and data.get("text"):
+            lang, self._voice_lang = self._voice_lang, None
+            if Config.load().speak_replies:
+                self.speak(data["text"], lang)
 
     def _ask_user(self, question: str) -> str:
         self._js("askUser", question)

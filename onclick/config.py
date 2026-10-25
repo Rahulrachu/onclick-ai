@@ -57,6 +57,12 @@ PROVIDERS: dict[str, dict] = {
         "key_env": "GROQ_API_KEY",
         "note": "console.groq.com/keys (no vision)",
     },
+    "evon": {
+        "base_url": "http://localhost:8000/v1",
+        "model": "gnani/gnani-evon-v3.3-30B-A3B",
+        "key_env": "",
+        "note": "Gnani Evon v3.3 served locally with vLLM or llama.cpp (OpenAI-compatible). See docs/EVON.md",
+    },
     "ollama": {
         "base_url": "http://localhost:11434/v1",
         "model": "qwen2.5:7b",
@@ -99,6 +105,10 @@ class Config:
     auto_approve_risky: bool = False
     browser_channel: str = "msedge" if sys.platform == "win32" else "chromium"
     headless_browser: bool = False
+    # Voice (Gnani AI): Prisma v2.5 speech-to-text, Timbre v2.5 text-to-speech.
+    gnani_api_key: str = ""
+    voice_language: str = "kannada"
+    speak_replies: bool = True
     extra: dict = field(default_factory=dict)
 
     def resolved_model(self) -> str:
@@ -136,4 +146,7 @@ class Config:
         self.path().write_text(json.dumps(asdict(self), indent=2), encoding="utf-8")
 
     def is_ready(self) -> bool:
-        return bool(self.resolved_key()) or self.provider == "ollama"
+        return bool(self.resolved_key()) or self.provider in ("ollama", "evon")
+
+    def resolved_gnani_key(self) -> str:
+        return self.gnani_api_key or os.environ.get("GNANI_API_KEY", "")

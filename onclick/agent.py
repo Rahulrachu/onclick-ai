@@ -16,7 +16,7 @@ SYSTEM_PROMPT = """You are OnClick AI, an agent running directly on the user's {
 How you work:
 - Make a short plan, then act. After each action, look at the result and adjust. Keep going until the task is truly done or impossible.
 - Prefer the cheapest reliable tool: windows_settings for Windows look/theme/taskbar, web_search/fetch_url for information, browser_* tools for websites (bookings, forms, shopping), run_command for scripts/installs/files, blender_run_script for 3D, screenshot + mouse/keyboard only for desktop apps with no better route.
-- Websites: read the snapshot's numbered elements and act by ref. Use browser_screenshot when layout matters (date pickers, seat maps).
+- Websites: read the snapshot's numbered elements and act by ref. Only the newest page snapshot is kept in full; older ones are trimmed, so act on the latest refs and call browser_snapshot if you need the page again. Use browser_screenshot when layout matters (date pickers, seat maps).
 - If a site needs a login, ask_user whether they want to sign in themselves in the open browser window; then wait and continue.
 - Missing details only the user knows (dates, passenger names, budget, choices): ask_user once, briefly, with your best suggestion.
 - Money and commitments: never enter card numbers yourself. Before the final pay/book/order button, summarize what will be bought and the total; the app will ask the user to approve that click.
@@ -48,6 +48,8 @@ class Agent:
         self.client = client or make_client(ctx.cfg)
         self.registry = build_registry(ctx)
         self.stop_requested = False
+        self._tool_names: dict[int, str] = {}  # id(tool message) -> tool name, for compaction (ids can repeat across turns)
+        self._compacted: set[int] = set()  # id(tool message) already trimmed (kept off the messages so providers never see extra keys)
         self.messages: list[dict] = [{
             "role": "system",
             "content": SYSTEM_PROMPT.format(os=f"{platform.system()} {platform.release()}", workspace=ctx.workspace,
@@ -100,7 +102,9 @@ class Agent:
                 self.on_event("result", {"name": call.name, "text": result.text[:600], "files": result.files,
                                          "has_image": bool(result.image_png),
                                          "image": result.image_data_url() if call.name in ("blender_run_script", "browser_screenshot", "screenshot") else None})
-                self.messages.append({"role": "tool", "tool_call_id": call.id, "content": result.text})
+                tool_msg = {"role": "tool", "tool_call_id": call.id, "content": result.text}
+                self.messages.append(tool_msg)
+                self._tool_names[id(tool_msg)] = call.name
                 if result.image_png:
                     images.append((call.name, result.image_data_url()))
             if images:
@@ -108,6 +112,7 @@ class Agent:
                 parts += [{"type": "image_url", "image_url": {"url": url}} for _, url in images]
                 self.messages.append({"role": "user", "content": parts})
             self._prune_images()
+            self._compact_tool_results()
         msg = f"Reached the {self.ctx.cfg.max_steps}-step limit. Say 'continue' to keep going."
         self.on_event("done", {"text": msg})
         return msg
@@ -120,6 +125,48 @@ class Agent:
                 seen += 1
                 if seen > keep:
                     m["content"] = [p for p in m["content"] if p.get("type") == "text"] + [{"type": "text", "text": "(older image removed)"}]
+
+    KEEP_FULL = 4          # most recent tool results kept verbatim
+    OLD_LIMIT = 600        # older non-browser results are cut to this many chars
+    OLD_SNAPSHOT_LIMIT = 300  # older browser page snapshots are cut harder
+
+    def _compact_tool_results(self) -> None:
+        """Keep the context small on long tasks.
+
+        Every browser action returns a full page snapshot (up to ~8k chars). Only the latest
+        one describes the page as it is now, so older snapshots shrink to their first lines
+        (what was done, title, URL). Other tool results stay whole for the last KEEP_FULL
+        calls and are trimmed after that.
+        """
+        tool_idx = [i for i, m in enumerate(self.messages) if m["role"] == "tool"]
+        if not tool_idx:
+            return
+        latest_snapshot = None
+        for i in reversed(tool_idx):
+            if self._is_snapshot(self.messages[i]):
+                latest_snapshot = i
+                break
+        recent = set(tool_idx[-self.KEEP_FULL:])
+        for i in tool_idx:
+            m = self.messages[i]
+            text = m["content"] if isinstance(m["content"], str) else str(m["content"])
+            if id(m) in self._compacted or i == latest_snapshot:
+                continue
+            if self._is_snapshot(m):
+                limit = self.OLD_SNAPSHOT_LIMIT
+                note = "[older page snapshot trimmed; call browser_snapshot for the current page]"
+            elif i in recent:
+                continue
+            else:
+                limit = self.OLD_LIMIT
+                note = "[older tool output trimmed]"
+            if len(text) > limit + len(note):
+                m["content"] = text[:limit].rstrip() + "\n" + note
+            self._compacted.add(id(m))
+
+    def _is_snapshot(self, m: dict) -> bool:
+        name = self._tool_names.get(id(m), "")
+        return name.startswith("browser_") and name != "browser_screenshot"
 
     def transcript(self) -> str:
         return json.dumps([m for m in self.messages if m["role"] != "system"], indent=1)[:200000]

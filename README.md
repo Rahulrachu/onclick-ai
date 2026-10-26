@@ -18,7 +18,7 @@ First launch opens **Settings**: pick a provider and paste an API key.
 
 | Provider | Default model | Key |
 |---|---|---|
-| Gemini (default, has a free tier) | gemini-2.5-flash | aistudio.google.com/apikey |
+| Gemini (default, has a free tier) | gemini-3.8-flash | aistudio.google.com/apikey |
 | OpenAI | gpt-4.1 | platform.openai.com |
 | Anthropic | claude-sonnet-4-5 | console.anthropic.com |
 | OpenRouter | any | openrouter.ai |
@@ -37,6 +37,8 @@ Pick a model with vision (Gemini, GPT-4.1, Claude) for screen control and checki
 | Blender | blender_run_script, blender_open | Writes bpy scripts, builds the scene, renders a PNG, looks at the render, and fixes it |
 | Windows look | windows_settings: dark/light mode, transparency, taskbar alignment and auto-hide, wallpaper, accent color, one-call macOS-style setup (dock, translucent taskbar, Quick Look, PowerToys, Seelen UI) | "Make my PC dark mode and look like a Mac" |
 | Desktop | screenshot, mouse_click, mouse_drag, type_text, press_keys, scroll, wait | Any app without a better route |
+
+**Voice:** press the mic, speak in Kannada, Hindi, Hinglish, Tamil, Telugu or English. Speech is transcribed by Gnani Prisma and short replies are read back with Gnani Timbre (needs a Gnani API key in Settings).
 
 Everything it makes is saved in `C:\Users\<you>\OnClickAI\`.
 
@@ -74,11 +76,20 @@ prompt → model plans → tool call → real action (browser / shell / Blender 
 - `onclick/llm.py` provider clients (OpenAI-style and Anthropic) with tool calling
 - `onclick/tools/` browser, web, system, desktop, Blender
 - `onclick/safety.py` what needs your OK
+- Long tasks stay cheap: only the newest browser page snapshot and the last few tool outputs are kept whole; older ones are trimmed to a few hundred characters, so a 30-page browsing task stays around 35k characters of context instead of 240k.
+- Gemini 3 thought signatures are passed back untouched on every tool call, which multi-step tool use on Gemini 3 requires.
 - `onclick/ui/index.html` + `onclick/webapp.py` the chat window (Edge WebView2); `onclick/gui.py` classic fallback window; `onclick/__main__.py` CLI
+
+## Honest limitations (today)
+
+- Not yet proven end to end against a real model in CI; tests use a scripted fake model. A real-model eval is next on the list.
+- Desktop apps are driven by screenshots and coordinate clicks, which is slow and can miss. Windows UI Automation control is planned.
+- No saved chat history, plan checklist or markdown rendering in the window yet.
+- The exe is unsigned, so Windows SmartScreen warns on first run (More info, then Run anyway).
 
 ## Roadmap
 
-- Voice prompts and a global hotkey
+- Global hotkey and tray icon
 - Task history and resumable runs
 - Accessibility-tree control of Windows apps (faster and more reliable than clicking pixels)
 - Blender add-on mode (drive the open Blender window live)

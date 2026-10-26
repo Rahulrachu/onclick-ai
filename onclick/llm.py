@@ -76,19 +76,36 @@ class OpenAICompatClient:
         except (KeyError, IndexError):
             raise LLMError(f"Unexpected response: {json.dumps(data)[:500]}")
         calls = []
-        for tc in msg.get("tool_calls") or []:
-            fn = tc.get("function", {})
-            try:
-                args = json.loads(fn.get("arguments") or "{}")
-            except json.JSONDecodeError:
-                args = {"_raw": fn.get("arguments")}
-            calls.append(ToolCall(id=tc.get("id") or f"call_{len(calls)}", name=fn.get("name", ""), arguments=args))
+        kept = []
+        for i, tc in enumerate(msg.get("tool_calls") or []):
+            # Keep the provider's dict verbatim: Gemini 3 puts a thought signature in
+            # tc["extra_content"]["google"]["thought_signature"] and rejects the next
+            # request (HTTP 400) if it is not sent back exactly as received.
+            tc = json.loads(json.dumps(tc))
+            fn = tc.setdefault("function", {})
+            tc.setdefault("type", "function")
+            if not tc.get("id"):
+                tc["id"] = f"call_{i}"
+            raw_args = fn.get("arguments")
+            if isinstance(raw_args, dict):  # some servers (ollama) send an object
+                args = raw_args
+                fn["arguments"] = json.dumps(raw_args)
+            else:
+                try:
+                    args = json.loads(raw_args or "{}")
+                except json.JSONDecodeError:
+                    args = {"_raw": raw_args}
+                if not isinstance(args, dict):
+                    args = {"_raw": raw_args}
+                fn["arguments"] = raw_args or "{}"
+            calls.append(ToolCall(id=tc["id"], name=fn.get("name", ""), arguments=args))
+            kept.append(tc)
         raw = {"role": "assistant", "content": msg.get("content") or ""}
-        if msg.get("tool_calls"):
-            raw["tool_calls"] = [
-                {"id": c.id, "type": "function", "function": {"name": c.name, "arguments": json.dumps(c.arguments)}}
-                for c in calls
-            ]
+        if kept:
+            raw["tool_calls"] = kept
+        # Gemini can also sign a plain text turn; pass any message-level extras back too.
+        if msg.get("extra_content"):
+            raw["extra_content"] = msg["extra_content"]
         return LLMReply(text=msg.get("content") or "", tool_calls=calls, raw_assistant=raw)
 
 

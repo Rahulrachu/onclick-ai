@@ -101,9 +101,10 @@ jobs:
         run: |
           : > failed.log
           for job in $(gh api "repos/$REPO/actions/runs/$RUN/jobs" -q '.jobs[] | select(.conclusion=="failure") | .id'); do
-            name=$(gh api "repos/$REPO/actions/jobs/$job" -q .name)
-            echo "===== job: $name =====" >> failed.log
-            gh api "repos/$REPO/actions/jobs/$job/logs" | grep -v '^\s*$' | tail -n 120 >> failed.log || true
+            gh api "repos/$REPO/actions/jobs/$job" -q '"===== job: \(.name) =====", (.steps[] | select(.conclusion=="failure") | "failed step: \(.name)")' >> failed.log
+            curl -sSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO/actions/jobs/$job/logs" -o job.log || echo "(log download failed)" >> failed.log
+            grep -v '^\s*$' job.log | grep -iv 'Warning: ' | tail -n 120 >> failed.log || true
           done
           { echo "Run $RUN failed on ${GITHUB_SHA::7}: https://github.com/$REPO/actions/runs/$RUN"; echo; echo '```'; tail -c 60000 failed.log; echo '```'; } > body.md
           num=$(gh issue list -R "$REPO" --state all --search "CI failures in:title" --json number -q '.[0].number')

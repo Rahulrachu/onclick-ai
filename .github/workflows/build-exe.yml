@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: write
+  issues: write
+  actions: read
 
 jobs:
   test:
@@ -84,3 +86,25 @@ jobs:
           prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
           make_latest: true
           files: dist/*.exe
+
+  report-failure:
+    # Posts the failed steps' log tail to the "CI failures" issue so it can be read without opening the Actions UI.
+    needs: [test, blender-smoke, build]
+    if: failure() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post failed log tail
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN: ${{ github.run_id }}
+        run: |
+          : > failed.log
+          for job in $(gh api "repos/$REPO/actions/runs/$RUN/jobs" -q '.jobs[] | select(.conclusion=="failure") | .id'); do
+            name=$(gh api "repos/$REPO/actions/jobs/$job" -q .name)
+            echo "===== job: $name =====" >> failed.log
+            gh api "repos/$REPO/actions/jobs/$job/logs" | grep -v '^\s*$' | tail -n 120 >> failed.log || true
+          done
+          { echo "Run $RUN failed on ${GITHUB_SHA::7}: https://github.com/$REPO/actions/runs/$RUN"; echo; echo '```'; tail -c 60000 failed.log; echo '```'; } > body.md
+          num=$(gh issue list -R "$REPO" --state all --search "CI failures in:title" --json number -q '.[0].number')
+          if [ -z "$num" ]; then gh issue create -R "$REPO" --title "CI failures" --body-file body.md; else gh issue comment "$num" -R "$REPO" --body-file body.md; fi

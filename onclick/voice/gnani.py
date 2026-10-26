@@ -116,4 +116,9 @@ def synthesize(text: str, language: str, api_key: str, *, speed: float = 1.0, ti
 
 def wav_duration(wav_bytes: bytes) -> float:
     with wave.open(io.BytesIO(wav_bytes)) as w:
-        return w.getnframes() / float(w.getframerate())
+        rate, width, ch = w.getframerate(), w.getsampwidth(), w.getnchannels()
+        frames = w.getnframes()
+    # Streamed WAVs (e.g. Timbre) carry a placeholder size; fall back to the real payload length.
+    idx = wav_bytes.find(b"data")
+    real = (len(wav_bytes) - (idx + 8)) // (width * ch) if idx >= 0 else frames
+    return min(frames, real) / float(rate)

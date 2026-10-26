@@ -35,6 +35,7 @@ jobs:
       - name: Build and render a house through the agent's Blender tool
         run: BLENDER=$PWD/blender-4.2.3-linux-x64/blender PYTHONPATH=. python tests/smoke/blender_house.py
       - uses: actions/upload-artifact@v4
+        continue-on-error: true  # artifacts are a convenience; the release is what ships, so a full artifact quota must not fail the build
         if: always()
         with:
           retention-days: 3
@@ -73,6 +74,7 @@ jobs:
         shell: pwsh
         run: dist\OnClickAI-cli.exe --help
       - uses: actions/upload-artifact@v4
+        continue-on-error: true  # artifacts are a convenience; the release is what ships, so a full artifact quota must not fail the build
         with:
           retention-days: 3
           name: OnClickAI-windows

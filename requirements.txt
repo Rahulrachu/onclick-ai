@@ -6,3 +6,4 @@ pyperclip>=1.8
 pywebview>=5.0
 numpy>=1.26
 sounddevice>=0.4.6
+pywinauto>=0.6.8; sys_platform == 'win32'

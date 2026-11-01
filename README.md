@@ -83,7 +83,7 @@ prompt → model plans → tool call → real action (browser / shell / Blender 
 ## Honest limitations (today)
 
 - Not yet proven end to end against a real model in CI; tests use a scripted fake model. A real-model eval is next on the list.
-- Desktop apps are driven by screenshots and coordinate clicks, which is slow and can miss. Windows UI Automation control is planned.
+- Desktop apps are driven by Windows UI Automation (named controls via ui_inspect/ui_act) with screenshot clicks as fallback. Verified in CI only on Notepad; apps with custom-drawn UIs (games, some Electron apps) still need screenshots.
 - No saved chat history, plan checklist or markdown rendering in the window yet.
 - The exe is unsigned, so Windows SmartScreen warns on first run (More info, then Run anyway).
 

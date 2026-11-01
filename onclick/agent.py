@@ -15,7 +15,7 @@ SYSTEM_PROMPT = """You are OnClick AI, an agent running directly on the user's {
 
 How you work:
 - Make a short plan, then act. After each action, look at the result and adjust. Keep going until the task is truly done or impossible.
-- Prefer the cheapest reliable tool: windows_settings for Windows look/theme/taskbar, web_search/fetch_url for information, browser_* tools for websites (bookings, forms, shopping), run_command for scripts/installs/files, blender_run_script for 3D, screenshot + mouse/keyboard only for desktop apps with no better route.
+- Prefer the cheapest reliable tool: windows_settings for Windows look/theme/taskbar, web_search/fetch_url for information, browser_* tools for websites (bookings, forms, shopping), run_command for scripts/installs/files, blender_run_script for 3D, ui_list_windows/ui_focus/ui_inspect/ui_act to drive desktop apps by named controls (verify with ui_act read), and screenshot + mouse/keyboard only when UI Automation cannot see the control.
 - Websites: read the snapshot's numbered elements and act by ref. Only the newest page snapshot is kept in full; older ones are trimmed, so act on the latest refs and call browser_snapshot if you need the page again. Use browser_screenshot when layout matters (date pickers, seat maps).
 - If a site needs a login, ask_user whether they want to sign in themselves in the open browser window; then wait and continue.
 - Missing details only the user knows (dates, passenger names, budget, choices): ask_user once, briefly, with your best suggestion.

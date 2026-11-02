@@ -82,7 +82,7 @@ prompt → model plans → tool call → real action (browser / shell / Blender 
 
 ## Honest limitations (today)
 
-- Not yet proven end to end against a real model in CI; tests use a scripted fake model. A real-model eval is next on the list.
+- Real-model proof is new: CI now runs the agent against qwen2.5:7b (Ollama) on 4 checked tasks and writes the pass rate to docs/EVAL.md (add a GEMINI_API_KEY repo secret to also eval gemini-3.8-flash). Small local models are weaker than Gemini, so treat that rate as a floor.
 - Desktop apps are driven by Windows UI Automation (named controls via ui_inspect/ui_act) with screenshot clicks as fallback. Verified in CI only on Notepad; apps with custom-drawn UIs (games, some Electron apps) still need screenshots.
 - No saved chat history, plan checklist or markdown rendering in the window yet.
 - The exe is unsigned, so Windows SmartScreen warns on first run (More info, then Run anyway).

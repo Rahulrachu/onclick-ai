@@ -89,6 +89,36 @@ jobs:
           make_latest: true
           files: dist/*.exe
 
+  eval:
+    # Runs the real agent loop against a real (small, local) model on tasks with automatic checkers.
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip ci]')
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install requests numpy playwright && python -m playwright install --with-deps chromium
+      - name: Install Ollama and pull qwen2.5:7b
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          (ollama serve > ollama.log 2>&1 &)
+          sleep 8
+          ollama pull qwen2.5:7b
+      - name: Eval on qwen2.5:7b
+        run: PYTHONPATH=. python tests/eval/run_eval.py --provider ollama --model qwen2.5:7b --out docs/EVAL.md
+      - name: Eval on gemini-3.8-flash (only if GEMINI_API_KEY secret exists)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -n "$GEMINI_API_KEY" ]; then PYTHONPATH=. python tests/eval/run_eval.py --provider gemini --key "$GEMINI_API_KEY" --out docs/EVAL.md; else echo "no Gemini key; skipped"; fi
+      - name: Commit results
+        run: |
+          git config user.name "OnClick AI Bot"; git config user.email "bot@onclick.local"
+          git add docs/EVAL.md
+          git diff --cached --quiet || (git commit -m "Update eval results [skip ci]" && git pull --rebase && git push)
+
   report-failure:
     # Writes the latest failure's log tail into the body of the "CI failures" issue so it can be read without opening the Actions UI.
     needs: [test, blender-smoke, build]

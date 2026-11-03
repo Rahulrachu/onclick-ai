@@ -74,6 +74,25 @@ def tools(ctx):
         answer = ctx.ask_user(question)
         return ToolResult(f"User answered: {answer}" if answer else "User gave no answer.")
 
+    def update_plan(steps: list) -> ToolResult:
+        """Record the live checklist. steps: [{"step": str, "status": pending|doing|done|failed}]."""
+        ok = {"pending", "doing", "done", "failed"}
+        rows = []
+        for i, st in enumerate(steps or [], 1):
+            if isinstance(st, str):
+                st = {"step": st}
+            status = st.get("status", "pending")
+            if status not in ok:
+                status = "pending"
+            rows.append({"step": str(st.get("step", ""))[:200], "status": status})
+        ctx.state["plan"] = rows
+        mark = {"pending": "[ ]", "doing": "[~]", "done": "[x]", "failed": "[!]"}
+        text = "\n".join(f"{mark[r['status']]} {i}. {r['step']}" for i, r in enumerate(rows, 1))
+        hint = ""
+        if rows and all(r["status"] == "done" for r in rows):
+            hint = "\nAll steps done: verify the final result once, then reply."
+        return ToolResult("Plan:\n" + text + hint)
+
     def write_risk(args: dict):
         p = resolve(args.get("path", ""))
         try:
@@ -82,6 +101,8 @@ def tools(ctx):
         except ValueError:
             return f"Writes outside the OnClickAI folder: {p}" if p.exists() else None
 
+    plan_tool = Tool("update_plan", "Show the user a live checklist. Call at the start with 3-7 steps, then again whenever a step starts, finishes or fails. Mark a step done only after a tool result verifies it. If a step fails twice, change approach and say so in the plan.",
+                     params(["steps"], steps={"type": "array", "items": {"type": "object", "properties": {"step": {"type": "string"}, "status": {"type": "string", "enum": ["pending", "doing", "done", "failed"]}}, "required": ["step"]}}), update_plan)
     shell = "PowerShell" if IS_WIN else "bash"
     return [
         Tool("run_command", f"Run a {shell} command on the user's computer and return its output. Default folder is the OnClickAI workspace. Use for installing packages (winget, pip), scripts, git, file operations.",
@@ -95,4 +116,5 @@ def tools(ctx):
         Tool("list_dir", "List a folder's contents.", params([], path={"type": "string"}), list_dir),
         Tool("ask_user", "Ask the user a question and wait for their answer. Use for missing details (dates, names, budget, which option), one-time codes, and choices only they can make.",
              params(["question"], question={"type": "string"}), ask_user),
+        plan_tool,
     ]

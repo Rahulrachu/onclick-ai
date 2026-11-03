@@ -96,3 +96,14 @@ def test_anthropic_conversion():
     assert [m["role"] for m in out] == ["user", "assistant", "user"]
     assert out[2]["content"][0]["type"] == "tool_result"
     assert out[2]["content"][-1]["type"] == "image"
+
+
+def test_update_plan_tool(tmp_path):
+    steps = [{"step": "a", "status": "done"}, {"step": "b", "status": "bogus"}, "c"]
+    agent, _ = make(tmp_path, [
+        LLMReply(tool_calls=[ToolCall("1", "update_plan", {"steps": steps})]),
+        LLMReply(text="ok"),
+    ])
+    agent.run("plan")
+    plan = agent.ctx.state["plan"]
+    assert [r["status"] for r in plan] == ["done", "pending", "pending"]

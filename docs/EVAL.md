@@ -4,6 +4,15 @@ Written by CI (tests/eval/run_eval.py). Newest first.
 
 
 
+## 2026-11-03 - ollama/qwen2.5:7b: 4/4 passed
+
+| task | result | tool calls | seconds | note |
+|---|---|---|---|---|
+| write_file | pass | 1 | 459 |  |
+| fetch_fact | pass | 1 | 375 |  |
+| run_code | pass | 3 | 492 |  |
+| organize | pass | 3 | 457 |  |
+
 ## 2026-11-02 - ollama/qwen2.5:7b: 4/4 passed
 
 | task | result | tool calls | seconds | note |

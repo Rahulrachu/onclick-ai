@@ -41,6 +41,9 @@ main{flex:1;overflow-y:auto;scroll-behavior:smooth}
 .ai{gap:12px;align-items:flex-start}
 .ai .avatar{flex:0 0 28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;font-size:12px;font-weight:800;margin-top:2px}
 .ai .body{flex:1;min-width:0}
+.plan{border:1px solid #2a3350;border-radius:10px;padding:8px 12px;margin:6px 0;background:#121829;font-size:13px}
+.plan .ph{opacity:.6;font-size:11px;text-transform:uppercase;margin-bottom:4px}
+.plan .pi.done{color:#6ee7a0}.plan .pi.doing{color:#fbbf24}.plan .pi.failed{color:#f87171}.plan .pi.pending{opacity:.6}
 .ai .text{white-space:pre-wrap;word-wrap:break-word}
 .steps{margin:8px 0;border:1px solid var(--line);background:var(--bg2);border-radius:14px;overflow:hidden}
 .steps summary{list-style:none;cursor:pointer;padding:10px 14px;color:var(--mute);font-size:13px;display:flex;gap:8px;align-items:center}
@@ -194,11 +197,20 @@ function toggleMic(){ if(busy||listening) return; api().listen($('lang').value).
 function saveLang(){ api().save_config({voice_language:$('lang').value}); }
 document.addEventListener('keydown',e=>{ if(e.ctrlKey && e.code==='Space'){ e.preventDefault(); toggleMic(); } });
 
+let planCall=false;
+function renderPlan(steps){
+  const out=turn.querySelector('.out'); let box=turn.querySelector('.plan');
+  if(!box){ box=document.createElement('div'); box.className='plan'; out.insertBefore(box,out.firstChild); }
+  const mark={pending:'○',doing:'◐',done:'✔',failed:'✖'};
+  box.innerHTML='<div class="ph">Plan</div>'+steps.map(r=>{ if(typeof r==='string') r={step:r}; const st=r.status||'pending'; return `<div class="pi ${esc(st)}"><span>${mark[st]||'○'}</span> ${esc(r.step||'')}</div>`; }).join('');
+}
 window.onEvent = function(kind, d){
   if(VOICE[kind]){ voiceEvent(kind,d); return; }
   if(!turn && kind!=='done') return;
   if(kind==='thinking'){ setBusy(true,`Working · step ${d.step}`); }
   else if(kind==='say' && d.text.trim()){ const t=document.createElement('div'); t.className='text'; t.textContent=d.text.trim(); turn.querySelector('.out').appendChild(t); }
+  else if(kind==='tool' && d.name==='update_plan'){ renderPlan(d.args.steps||[]); planCall=true; }
+  else if(kind==='result' && planCall){ planCall=false; }
   else if(kind==='tool'){
     const args=Object.entries(d.args).filter(([k])=>k!=='script').map(([k,v])=>`${k}: ${String(v).slice(0,90)}`).join('  ·  ');
     const s=document.createElement('div'); s.className='step'; s.innerHTML=`<div class="ic">${icon(d.name)}</div><div><div class="nm">${esc(d.name.replace(/_/g,' '))}</div><div class="rs">${esc(args)}</div></div>`;

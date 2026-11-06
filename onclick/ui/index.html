@@ -35,6 +35,7 @@ main{flex:1;overflow-y:auto;scroll-behavior:smooth}
 .chip b{display:block;font-weight:600;margin-bottom:3px}
 .chip span{color:var(--mute);font-size:13px}
 .msg{margin:18px 0;display:flex}
+.text pre{background:#0b0d12;padding:8px;border-radius:6px;overflow:auto;white-space:pre}.text code{background:#1c2030;padding:1px 4px;border-radius:4px}.text a{color:#7aa2ff}.copybtn{display:block;margin-top:4px;background:none;border:1px solid #333;color:#889;border-radius:6px;font-size:11px;cursor:pointer}
 .msg.user{justify-content:flex-end}
 .bubble{max-width:78%;padding:11px 15px;border-radius:var(--r);white-space:pre-wrap;word-wrap:break-word}
 .user .bubble{background:linear-gradient(135deg,var(--acc),#5b8cff);border-bottom-right-radius:5px}
@@ -167,6 +168,18 @@ let busy=false, turn=null, providers={};
 function api(){ return window.pywebview && window.pywebview.api; }
 function icon(name){ for(const k in ICON){ if(name.startsWith(k)) return ICON[k]; } return '•'; }
 function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function md(src){
+  let t=esc(src); const blocks=[];
+  t=t.replace(/```(?:\w*)\n?([\s\S]*?)```/g,(m,c)=>{blocks.push(c.replace(/\n$/,''));return '\u0000'+(blocks.length-1)+'\u0000';});
+  t=t.replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>');
+  t=t.replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  t=t.replace(/^#{1,3} (.+)$/gm,'<b>$1</b>').replace(/^[-*] (.+)$/gm,'&bull; $1');
+  t=t.replace(/\u0000(\d+)\u0000/g,(m,i)=>'<pre>'+blocks[+i]+'</pre>');
+  return t;
+}
+function addText(parent,text){ const t=document.createElement('div'); t.className='text'; t.style.whiteSpace='pre-wrap'; t.innerHTML=md(text);
+  const b=document.createElement('button'); b.textContent='Copy'; b.className='copybtn'; b.onclick=()=>{ navigator.clipboard&&navigator.clipboard.writeText(text); b.textContent='Copied'; setTimeout(()=>b.textContent='Copy',1200); };
+  t.appendChild(b); parent.appendChild(t); }
 function scroll(){ const m=$('main'); m.scrollTop=m.scrollHeight; }
 function setBusy(b,text){ busy=b; $('dot').className='dot'+(b?' busy':''); $('status').textContent=text||(b?'Working…':'Ready');
   $('send').className='send'+(b?' stop':''); $('send').textContent=b?'■':'➤'; }
@@ -208,7 +221,7 @@ window.onEvent = function(kind, d){
   if(VOICE[kind]){ voiceEvent(kind,d); return; }
   if(!turn && kind!=='done') return;
   if(kind==='thinking'){ setBusy(true,`Working · step ${d.step}`); }
-  else if(kind==='say' && d.text.trim()){ const t=document.createElement('div'); t.className='text'; t.textContent=d.text.trim(); turn.querySelector('.out').appendChild(t); }
+  else if(kind==='say' && d.text.trim()){ addText(turn.querySelector('.out'),d.text.trim()); }
   else if(kind==='tool' && d.name==='update_plan'){ renderPlan(d.args.steps||[]); planCall=true; }
   else if(kind==='result' && planCall){ planCall=false; }
   else if(kind==='tool'){

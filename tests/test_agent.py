@@ -107,3 +107,9 @@ def test_update_plan_tool(tmp_path):
     agent.run("plan")
     plan = agent.ctx.state["plan"]
     assert [r["status"] for r in plan] == ["done", "pending", "pending"]
+
+
+def test_ui_has_markdown_and_copy():
+    from pathlib import Path
+    h = (Path(__file__).parent.parent / "onclick" / "ui" / "index.html").read_text(encoding="utf-8")
+    assert "function md(" in h and "copybtn" in h and "addText(" in h

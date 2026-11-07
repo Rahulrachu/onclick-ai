@@ -13,6 +13,7 @@ from pathlib import Path
 from .agent import Agent
 from .config import PROVIDERS, Config
 from .context import Context
+from . import history
 from . import voice as gvoice
 
 
@@ -31,6 +32,9 @@ class Bridge:
         self._agent: Agent | None = None
         self._voice_lang: str | None = None
         self._ctx: Context | None = None
+        self._chat_id = history.new_id()
+        self._prior: list[dict] = []
+        self._last_prompt = ""
         threading.Thread(target=self._worker, daemon=True).start()
 
     # ---- called from JS ----
@@ -55,6 +59,7 @@ class Bridge:
         if not Config.load().is_ready():
             self._js("onEvent", "done", {"text": ""})
             return "needs_key"
+        self._last_prompt = text
         self._jobs.put(("run", text))
         return "ok"
 
@@ -85,6 +90,7 @@ class Bridge:
             self._post("heard", {"text": t.text, "language": lang, "latency_ms": t.latency_ms})
             if t.text:
                 self._voice_lang = lang
+                self._last_prompt = t.text
                 self._jobs.put(("run", f"[voice:{lang}] {t.text}"))
         except Exception as e:
             self._post("heard", {"text": "", "error": f"{type(e).__name__}: {e}"})
@@ -111,7 +117,23 @@ class Bridge:
             self._agent.stop()
 
     def new_chat(self):
+        self._chat_id, self._prior = history.new_id(), []
         self._jobs.put(("reset", None))
+
+    def list_history(self):
+        return history.list_chats()
+
+    def open_chat(self, chat_id: str):
+        d = history.load(chat_id)
+        if not d:
+            return None
+        self._chat_id, self._prior = d["id"], history.as_messages(d["turns"])
+        self._jobs.put(("reset", None))
+        return d
+
+    def delete_chat(self, chat_id: str):
+        history.delete(chat_id)
+        return True
 
     def answer(self, value):
         self._answer.put(value)
@@ -132,6 +154,11 @@ class Bridge:
 
     def _post(self, kind: str, data: dict):
         self._js("onEvent", kind, data)
+        if kind == "done" and data.get("text") and self._last_prompt:
+            try:
+                history.add_turn(self._chat_id, self._last_prompt, data["text"])
+            except OSError:
+                pass
         # Read the final answer of a spoken request aloud in the language it was asked in.
         if kind == "done" and self._voice_lang and data.get("text"):
             lang, self._voice_lang = self._voice_lang, None
@@ -160,6 +187,7 @@ class Bridge:
                 if self._agent is None:
                     self._ctx = Context(cfg=Config.load(), ask_user=self._ask_user)
                     self._agent = Agent(self._ctx, on_event=self._post, approve=self._approve)
+                    self._agent.messages.extend(self._prior)
                 self._agent.run(payload)
             except Exception as e:
                 self._post("error", {"text": f"{type(e).__name__}: {e}"})

@@ -103,6 +103,7 @@ input,select{width:100%;height:38px;background:var(--card);border:1px solid var(
     <div class="logo">O</div><div class="brand">OnClick AI</div>
     <div class="pill"><span class="dot" id="dot"></span><span id="status">Ready</span></div>
     <div class="spacer"></div>
+    <button class="ibtn" onclick="openHistory()">🕘 History</button>
     <button class="ibtn" onclick="newChat()">＋ New chat</button>
     <button class="ibtn" onclick="openSettings()">⚙ Settings</button>
   </header>
@@ -158,6 +159,10 @@ input,select{width:100%;height:38px;background:var(--card);border:1px solid var(
   <div class="row" style="margin-top:18px"><button class="btn" onclick="closeOv('ov-settings')">Cancel</button><button class="btn pri" onclick="saveSettings()">Save</button></div>
 </div></div>
 
+<div class="ov" id="ov-hist"><div class="modal">
+  <h3>Recent chats</h3><div id="hist-list" style="max-height:50vh;overflow-y:auto"></div>
+  <div class="row"><button class="ibtn" onclick="closeOv('ov-hist')">Close</button></div>
+</div></div>
 <div class="ov lightbox" id="ov-img" onclick="closeOv('ov-img')"><img id="lb"></div>
 
 <script>
@@ -262,6 +267,18 @@ function sendOrStop(){
   addUser(t); setBusy(true);
 }
 function useChip(el){ $('input').value=el.querySelector('span').textContent; autosize(); $('input').focus(); }
+async function openHistory(){
+  const l=await api().list_history();
+  $('hist-list').innerHTML=l.length?l.map(c=>`<div class="chip" style="margin:6px 0;display:flex;justify-content:space-between;gap:10px"><span onclick="openChat('${c.id}')" style="cursor:pointer;flex:1">${esc(c.title)||'(untitled)'}<div class="small">${new Date(c.updated*1000).toLocaleString()} · ${c.turns} message${c.turns===1?'':'s'}</div></span><span onclick="delChat('${c.id}')" title="Delete" style="cursor:pointer">🗑</span></div>`).join(''):'<p class="small">No saved chats yet.</p>';
+  $('ov-hist').classList.add('show');
+}
+async function openChat(id){
+  if(busy) return; const d=await api().open_chat(id); if(!d) return; closeOv('ov-hist');
+  $('feed').innerHTML='';
+  for(const t of d.turns){ addUser(t.prompt); turn.querySelector('.typing').remove(); turn.querySelector('details').remove(); addText(turn.querySelector('.out'),t.answer); }
+  setBusy(false);
+}
+async function delChat(id){ await api().delete_chat(id); openHistory(); }
 function newChat(){ if(busy) return; api().new_chat(); $('feed').innerHTML=''; location.reload(); }
 function autosize(){ const t=$('input'); t.style.height='auto'; t.style.height=Math.min(t.scrollHeight,180)+'px'; }
 $('input').addEventListener('input',autosize);

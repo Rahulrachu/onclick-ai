@@ -84,13 +84,13 @@ prompt → model plans → tool call → real action (browser / shell / Blender 
 
 - Real-model proof is new: CI now runs the agent against qwen2.5:7b (Ollama) on 4 checked tasks and writes the pass rate to docs/EVAL.md (add a GEMINI_API_KEY repo secret to also eval gemini-3.8-flash). Small local models are weaker than Gemini, so treat that rate as a floor.
 - Desktop apps are driven by Windows UI Automation (named controls via ui_inspect/ui_act) with screenshot clicks as fallback. Verified in CI only on Notepad; apps with custom-drawn UIs (games, some Electron apps) still need screenshots.
-- Replies render basic markdown with a copy button, and the plan checklist is shown; no saved chat history or onboarding yet.
+- Replies render basic markdown with a copy button, the plan checklist is shown, and chats are saved and can be reopened from History (text only: reopened chats keep prompts and answers, not tool outputs). No onboarding yet.
 - The exe is unsigned, so Windows SmartScreen warns on first run (More info, then Run anyway).
 
 ## Roadmap
 
 - Global hotkey and tray icon
-- Task history and resumable runs
+- Resumable runs with full tool state
 - Accessibility-tree control of Windows apps (faster and more reliable than clicking pixels)
 - Blender add-on mode (drive the open Blender window live)
 - Parallel sub-agents for research-heavy tasks

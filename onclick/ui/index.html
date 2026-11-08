@@ -146,6 +146,7 @@ input,select{width:100%;height:38px;background:var(--card);border:1px solid var(
 
 <div class="ov" id="ov-settings"><div class="modal">
   <h3>Settings</h3>
+  <div class="small" id="s-onboard" style="display:none;margin-bottom:10px">Welcome! Fastest start: get a free Gemini key (about 1 minute, no card), paste it below and press Save. <a href="#" onclick="api().open_url('https://aistudio.google.com/apikey');return false">Get a free key</a></div>
   <label>AI provider</label><select id="s-provider" onchange="provNote()"></select>
   <div class="small" id="s-note"></div>
   <label>API key</label><input id="s-key" type="password" placeholder="Paste your key">
@@ -288,7 +289,7 @@ async function openSettings(){
   const c=await api().get_config(); providers=c.providers;
   $('s-provider').innerHTML=Object.keys(providers).map(p=>`<option ${p===c.provider?'selected':''}>${p}</option>`).join('');
   $('s-key').value=c.api_key; $('s-model').value=c.model; $('s-blender').value=c.blender_path; $('s-steps').value=c.max_steps; $('s-auto').checked=c.auto_approve_risky; $('s-gkey').value=c.gnani_api_key||''; $('s-speak').checked=c.speak_replies;
-  provNote(); $('ov-settings').classList.add('show');
+  provNote(); $('s-onboard').style.display=c.ready?'none':'block'; $('ov-settings').classList.add('show');
 }
 function provNote(){ const p=providers[$('s-provider').value]||{}; $('s-note').textContent=`Default model ${p.model||''} · ${p.note||''}`; }
 async function saveSettings(){

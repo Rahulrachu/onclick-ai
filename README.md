@@ -94,3 +94,5 @@ prompt → model plans → tool call → real action (browser / shell / Blender 
 - Accessibility-tree control of Windows apps (faster and more reliable than clicking pixels)
 - Blender add-on mode (drive the open Blender window live)
 - Parallel sub-agents for research-heavy tasks
+
+First run: if no API key is set, Settings opens with a link to get a free Gemini key.

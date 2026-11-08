@@ -147,6 +147,11 @@ class Bridge:
         except OSError:
             pass
 
+    def open_url(self, url: str):
+        import webbrowser
+        if url.startswith("https://"):
+            webbrowser.open(url)
+
     # ---- internals ----
     def _js(self, fn: str, *args):
         if self._window:

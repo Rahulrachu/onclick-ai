@@ -223,10 +223,12 @@ function renderPlan(steps){
   const mark={pending:'○',doing:'◐',done:'✔',failed:'✖'};
   box.innerHTML='<div class="ph">Plan</div>'+steps.map(r=>{ if(typeof r==='string') r={step:r}; const st=r.status||'pending'; return `<div class="pi ${esc(st)}"><span>${mark[st]||'○'}</span> ${esc(r.step||'')}</div>`; }).join('');
 }
+let T0=Date.now(), NT=0;
 window.onEvent = function(kind, d){
+  if(kind==='tool') NT++;
   if(VOICE[kind]){ voiceEvent(kind,d); return; }
   if(!turn && kind!=='done') return;
-  if(kind==='thinking'){ setBusy(true,`Working · step ${d.step}`); }
+  if(kind==='thinking'){ if(d.step===1){T0=Date.now();NT=0;} const sec=Math.round((Date.now()-T0)/1000); setBusy(true,`Working · step ${d.step} · ${NT} actions · ${sec}s`); }
   else if(kind==='say' && d.text.trim()){ addText(turn.querySelector('.out'),d.text.trim()); }
   else if(kind==='tool' && d.name==='update_plan'){ renderPlan(d.args.steps||[]); planCall=true; }
   else if(kind==='result' && planCall){ planCall=false; }
